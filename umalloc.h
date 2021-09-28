@@ -3,6 +3,8 @@
 
 #define ALIGNMENT 16 /* The alignment of all payloads returned by umalloc */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
+#define HEADER_SIZE 128
+#define MAGIC_NUM (void *) 0xDEADBEEF
 
 /*
  * memory_block_t - Represents a block of memory managed by the heap. The 
@@ -12,7 +14,7 @@
  * and the remaining 60 bit represent the size.
  */
 typedef struct memory_block_struct {
-    size_t block_size_alloc;
+    size_t block_size_alloc; //will represent the size of PAYLOAD!
     struct memory_block_struct *next;
 } memory_block_t;
 

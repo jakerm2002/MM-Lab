@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-const char author[] = ANSI_BOLD ANSI_COLOR_RED "REPLACE THIS WITH YOUR NAME AND UT EID" ANSI_RESET;
+const char author[] = ANSI_BOLD ANSI_COLOR_RED "Jake Medina jrm7784" ANSI_RESET;
 
 /*
  * The following helpers can be used to interact with the memory_block_t
@@ -93,6 +93,27 @@ memory_block_t *get_block(void *payload) {
  * find - finds a free block that can satisfy the umalloc request.
  */
 memory_block_t *find(size_t size) {
+
+    //we must traverse through our free list to see if there is a fit
+    //uses first-fit algorithm
+
+    //start at the beginning of the free list
+    memory_block_t *current_block = free_head;
+
+    //while we still have blocks remaining in the free list
+    while(current_block) {
+        //check if the malloc call will fit
+        int requested_size = ALIGN(size);
+        if (get_size(current_block) >= requested_size) {
+            //this malloc call will fit, return this block
+            return current_block;
+        } else {
+            //keep going, traverse to the next free block
+            *current_block = *current_block->next;
+        }
+    }
+
+    //if a block is not found, return null
     return NULL;
 }
 
@@ -100,7 +121,23 @@ memory_block_t *find(size_t size) {
  * extend - extends the heap if more memory is required.
  */
 memory_block_t *extend(size_t size) {
-    return NULL;
+
+    //creates a new block that will fit memory of [size]
+
+    int EXTEND_SIZE = PAGESIZE * 3;
+    memory_block_t *new_block;
+
+    if(size > EXTEND_SIZE) {
+        new_block = (memory_block_t *) csbrk(ALIGN(size));
+        new_block->block_size_alloc = ALIGN(size) - HEADER_SIZE;
+    } else {
+        new_block = (memory_block_t *) csbrk(PAGESIZE * 3);
+        new_block->block_size_alloc = PAGESIZE * 3;
+    }
+    
+    new_block->next = NULL;
+
+    return new_block;
 }
 
 /*
@@ -124,6 +161,19 @@ memory_block_t *coalesce(memory_block_t *block) {
  * along with allocating initial memory.
  */
 int uinit() {
+
+    // printf("initializing...");
+    
+    //call csbrk() with size PAGESIZE * 2 and add it to the free list!
+    int INITIAL_SIZE = PAGESIZE * 2;
+    free_head = (memory_block_t *) csbrk(INITIAL_SIZE);
+
+    //store (amount of free memory at the beginning of the list) - (header size)
+    free_head->block_size_alloc = INITIAL_SIZE - HEADER_SIZE;
+
+    //define that this is the only block in the free list
+    free_head->next = NULL; //is this already set to null?
+
     return 0;
 }
 
@@ -131,7 +181,34 @@ int uinit() {
  * umalloc -  allocates size bytes and returns a pointer to the allocated memory.
  */
 void *umalloc(size_t size) {
-    return NULL;
+
+    // printf("allocating a block of size");
+    printf("%d ", (int) size);
+    memory_block_t *found_block = find(size);
+
+    if(found_block) {
+        // printf("found a block, allocating...");
+        //allocate the memory
+        allocate(found_block);
+        //if the block is at the beginning of the free list,
+        //then we need to set free_head to the next element in the list
+        //keep in mind that the next element could be null!
+        free_head = found_block->next;
+
+        found_block->next = MAGIC_NUM;
+        return get_payload(found_block);
+    } else {
+        //no memory avaliable, we need to extend
+        // printf("no memory avaliable, extending...");
+        memory_block_t *new_block = extend(size);
+        allocate(new_block);
+        new_block->next = MAGIC_NUM;
+        
+        //DO LATER - split the new block?
+
+        return get_payload(new_block);
+    }
+
 }
 
 /*
@@ -139,4 +216,50 @@ void *umalloc(size_t size) {
  * by a previous call to malloc.
  */
 void ufree(void *ptr) {
+
+    memory_block_t *block = get_block(ptr);
+    //if the user tries to free an unallocated block, do nothing
+    //we know that the block is unallocated because it will not have a magic number
+    if( is_allocated(block) && &(block->next) == MAGIC_NUM ) {
+
+        //we need to convert this block into a free block
+        deallocate(block);
+
+        //figure out where to insert this block into the free list
+        
+        memory_block_t *prev_free_block = NULL;
+        memory_block_t *current_free_block = free_head;
+
+        while (current_free_block) {
+            if (&block < &current_free_block) {
+                //this is the place where our block should go
+
+                //check if this block will be at the beginning of the free list
+                if (!prev_free_block) {
+                    block->next = free_head;
+                    *free_head = *block;
+                    return;
+                } else {
+                    //splice!
+                    prev_free_block->next = block;
+                    block->next = current_free_block;
+                    return;
+                }
+                
+            } else {
+                //keep going through the free list
+                prev_free_block = current_free_block;
+                current_free_block = current_free_block->next;
+            }
+        }
+
+        //we have reached the end of the list
+        //append the free block to the end of the list
+        prev_free_block->next = block;
+        return;
+
+    }
+    
+    //if we reach here, the block was either not set as allocated or did not
+    //contain the magic number
 }
