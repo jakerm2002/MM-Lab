@@ -5,6 +5,7 @@
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
 #define HEADER_SIZE 128
 #define MAGIC_NUM (void *) 0xDEADBEEF
+// #define MAGIC_NUM_FREE (void *) 0xF4EEB1CC
 
 /*
  * memory_block_t - Represents a block of memory managed by the heap. The 
@@ -27,6 +28,8 @@ memory_block_t *get_next(memory_block_t *block);
 void put_block(memory_block_t *block, size_t size, bool alloc);
 void *get_payload(memory_block_t *block);
 memory_block_t *get_block(void *payload);
+void add_to_alloc_list(memory_block_t *block);
+void remove_from_alloc_list(memory_block_t *block);
 
 memory_block_t *find(size_t size);
 memory_block_t *extend(size_t size);

@@ -14,6 +14,14 @@ const char author[] = ANSI_BOLD ANSI_COLOR_RED "Jake Medina jrm7784" ANSI_RESET;
 // A sample pointer to the start of the free list.
 memory_block_t *free_head;
 
+// A pointer to the start of the allocated list.
+memory_block_t *alloc_head;
+
+// Set to true if we wish to utilize an allocated list
+// to track all allocated blocks.
+// Used for completing methods in check_heap().
+bool alloc_list = true;
+
 /*
  * is_allocated - returns true if a block is marked as allocated.
  */
@@ -82,6 +90,61 @@ void *get_payload(memory_block_t *block) {
 memory_block_t *get_block(void *payload) {
     assert(payload != NULL);
     return ((memory_block_t *)payload) - 1;
+}
+
+void add_to_alloc_list(memory_block_t *block) {
+    assert(block != NULL);
+    assert(is_allocated(block));
+    
+    //we must change the NEXT pointer of the previous allocated block to point to this block
+
+    if(alloc_head) {
+        //we must loop through all allocated blocks to find the 
+        //end of the allocated list, which will point to the PREVIOUS ALLOCATED BLOCK
+
+        memory_block_t *cur = alloc_head;
+        while(cur->next) {
+            cur = cur->next;
+        }
+        //set the next field of this last element to point to our newly allocated block
+        cur->next = block;
+        block->next = NULL;
+    } else {
+        alloc_head = block;
+        alloc_head->next = NULL;
+    }
+
+    // block->next = NULL;
+}
+
+void remove_from_alloc_list(memory_block_t *block) {
+    assert(block != NULL);
+    // assert(!is_allocated(block));
+    assert(alloc_head); //make sure the alloc list is not empty
+
+    //if we are removing the first element, we can simply set
+    //alloc_head to alloc_head->next
+    if (alloc_head == block) {
+        alloc_head = alloc_head->next;
+        block->next = NULL;
+        return;
+    }
+
+    memory_block_t *prev = NULL;
+    memory_block_t *cur = alloc_head;
+    while(cur != block) {
+        prev = cur;
+        cur = cur->next;
+    }
+    prev->next = cur->next;
+    cur->next = NULL;
+
+    // while (cur) {
+    //     if (cur == block) {
+    //         //we must remove this block from the list
+    //         prev->next = cur->next;
+    //     }
+    // }
 }
 
 /*
@@ -162,7 +225,8 @@ memory_block_t *coalesce(memory_block_t *block) {
  */
 int uinit() {
 
-    // printf("initializing...");
+    // printf("initializing...\n");
+    
     
     //call csbrk() with size PAGESIZE * 2 and add it to the free list!
     int INITIAL_SIZE = PAGESIZE * 2;
@@ -182,29 +246,46 @@ int uinit() {
  */
 void *umalloc(size_t size) {
 
-    // printf("allocating a block of size");
-    printf("%d ", (int) size);
+    // printf("allocating a block of size\n");
+    // printf("%d\n", (int) size);
+
     memory_block_t *found_block = find(size);
 
     if(found_block) {
         // printf("found a block, allocating...");
         //allocate the memory
         allocate(found_block);
+
+        //REMOVE THE BLOCK FROM THE FREE LIST
+        //assumes first-fit algohirthm
         //if the block is at the beginning of the free list,
         //then we need to set free_head to the next element in the list
         //keep in mind that the next element could be null!
         free_head = found_block->next;
 
-        found_block->next = MAGIC_NUM;
+        if(alloc_list) {
+            // printf("adding to alloc list\n");
+            add_to_alloc_list(found_block);
+        } else {
+            found_block->next = MAGIC_NUM;
+        }
+
         return get_payload(found_block);
     } else {
         //no memory avaliable, we need to extend
         // printf("no memory avaliable, extending...");
         memory_block_t *new_block = extend(size);
         allocate(new_block);
-        new_block->next = MAGIC_NUM;
+
+        if(alloc_list) {
+            // printf("adding our brand new memory to alloc list\n");
+            add_to_alloc_list(new_block);
+        } else {
+            new_block->next = MAGIC_NUM;
+        }
         
         //DO LATER - split the new block?
+        //we would have to add the part that we don't use to the free list
 
         return get_payload(new_block);
     }
@@ -219,14 +300,26 @@ void ufree(void *ptr) {
 
     memory_block_t *block = get_block(ptr);
     //if the user tries to free an unallocated block, do nothing
-    //we know that the block is unallocated because it will not have a magic number
-    if( is_allocated(block) && &(block->next) == MAGIC_NUM ) {
+    //we know that the block is unallocated because it will not have a magic number (if not using alloc list)
+    if( is_allocated(block) && (alloc_list ? true : &(block->next) == MAGIC_NUM) ) {
 
+        //if we are using the allocated list, we need to remove our block from there
+        if (alloc_list) {
+            remove_from_alloc_list(block);
+        }
+        
         //we need to convert this block into a free block
         deallocate(block);
 
+        //if the free list is empty, we can simply set free_head to the block
+        if (!free_head) {
+            free_head = block;
+            block->next = NULL;
+            return;
+        }
+
+
         //figure out where to insert this block into the free list
-        
         memory_block_t *prev_free_block = NULL;
         memory_block_t *current_free_block = free_head;
 
@@ -237,7 +330,7 @@ void ufree(void *ptr) {
                 //check if this block will be at the beginning of the free list
                 if (!prev_free_block) {
                     block->next = free_head;
-                    *free_head = *block;
+                    free_head = block;
                     return;
                 } else {
                     //splice!
@@ -256,6 +349,7 @@ void ufree(void *ptr) {
         //we have reached the end of the list
         //append the free block to the end of the list
         prev_free_block->next = block;
+        block->next = NULL;
         return;
 
     }
