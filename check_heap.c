@@ -99,12 +99,12 @@ int check_heap() {
             //ensure that we are not checking a block with itself
             if (cur != loop) {
                 //check if starting_address(cur) is within address range of [loop] (indicates overlap)
-                if ( (cur > loop) && ((void *)cur < (void *)loop + get_size(loop)) ) {
+                if ( (cur >= loop) && ((void *)cur < (void *)loop + get_size(loop)) ) {
                     return 40;
                 }
 
                 //check if ending_address(cur) is within address range of [loop] (indicates overlap)
-                if ( ((void *)cur + get_size(cur) > (void *)loop) && ((void *)cur + get_size(cur) < (void *)loop + get_size(loop)) ) {
+                if ( ((void *)cur + get_size(cur) > (void *)loop) && ((void *)cur + get_size(cur) <= (void *)loop + get_size(loop)) ) {
                     return 45;
                 }
             }
