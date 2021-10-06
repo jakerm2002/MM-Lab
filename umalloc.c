@@ -20,7 +20,7 @@ memory_block_t *alloc_head;
 // Set to true if we wish to utilize an allocated list
 // to track all allocated blocks.
 // Used for completing methods in check_heap().
-bool alloc_list = true;
+bool alloc_list = false;
 
 /*
  * is_allocated - returns true if a block is marked as allocated.
