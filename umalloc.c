@@ -158,6 +158,7 @@ void remove_from_alloc_list(memory_block_t *block) {
 memory_block_t *find(size_t size) {
 
     //we must traverse through our free list to see if there is a fit
+
     //uses first-fit algorithm
 
     //start at the beginning of the free list
@@ -208,9 +209,21 @@ memory_block_t *extend(size_t size) {
 
 /*
  * split - splits a given block in parts, one allocated, one free.
+ * pre: size must be ALIGNMENT-byte aligned.
  */
 memory_block_t *split(memory_block_t *block, size_t size) {
-    return NULL;
+    assert(!is_allocated(block));
+    assert(size % ALIGNMENT == 0);
+    //ensure that we didn't accidentally request too much
+    assert(size < block->block_size_alloc + HEADER_SIZE);
+    
+    memory_block_t *f_block = (void *) block + size; //portion of the block to be left unallocated
+    put_block(f_block, block->block_size_alloc - size, false);
+
+    block->block_size_alloc = size - HEADER_SIZE;
+    block->next = f_block;
+
+    return block;
 }
 
 /*
@@ -253,8 +266,17 @@ void *umalloc(size_t size) {
     // printf("%d\n", (int) size);
 
     memory_block_t *found_block = find(size);
+    //points to a block of at least ALIGN(size)
 
     if(found_block) {
+
+        //we will split the block here
+        //pass in an aligned size parameter, i.e. ALIGN(size)
+
+        //do not split if ALIGN(size) = found_block->block_size_alloc + HEADER_SIZE
+        //this will create a pointer to nothing
+        found_block = split(found_block, ALIGN(size));
+
         // printf("found a block, allocating...");
         //allocate the memory
         allocate(found_block);
