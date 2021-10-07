@@ -172,7 +172,7 @@ memory_block_t *find(size_t size) {
             return current_block;
         } else {
             //keep going, traverse to the next free block
-            *current_block = *current_block->next;
+            current_block = current_block->next;
         }
     }
 
@@ -190,15 +190,15 @@ memory_block_t *extend(size_t size) {
     int EXTEND_SIZE = PAGESIZE * 3;
     memory_block_t *new_block;
 
-    if(size > EXTEND_SIZE) {
+    if(size + 16 > EXTEND_SIZE) {
         new_block = (memory_block_t *) csbrk(ALIGN(size + 16));
-        printf("extend, creating block of size %ld\n", ALIGN(size + 16));
+        // printf("extend, creating block of size %ld\n", ALIGN(size + 16));
 
         new_block->block_size_alloc = ALIGN(size + 16) - HEADER_SIZE;
-        printf("block_size_alloc is %ld\n", get_size(new_block));
+        // printf("block_size_alloc is %ld\n", get_size(new_block));
     } else {
-        new_block = (memory_block_t *) csbrk(PAGESIZE * 3);
-        new_block->block_size_alloc = PAGESIZE * 3 - HEADER_SIZE;
+        new_block = (memory_block_t *) csbrk(EXTEND_SIZE);
+        new_block->block_size_alloc = EXTEND_SIZE - HEADER_SIZE;
     }
     
     new_block->next = NULL;
