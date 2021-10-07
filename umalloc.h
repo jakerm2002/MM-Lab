@@ -1,9 +1,10 @@
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #define ALIGNMENT 16 /* The alignment of all payloads returned by umalloc */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
-#define HEADER_SIZE 16
+#define HEADER_SIZE 32
 #define MAGIC_NUM (void *) 0xDEADBEEF
 // #define MAGIC_NUM_FREE (void *) 0xF4EEB1CC
 
@@ -17,6 +18,8 @@
 typedef struct memory_block_struct {
     size_t block_size_alloc; //will represent the size of PAYLOAD!
     struct memory_block_struct *next;
+    struct memory_block_struct *prev;
+    uint64_t : 64; //8-byte padding to make the header 16-byte aligned.
 } memory_block_t;
 
 // Helper Functions, this may be editted if you change the signature in umalloc.c

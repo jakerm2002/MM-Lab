@@ -191,11 +191,11 @@ memory_block_t *extend(size_t size) {
     int EXTEND_SIZE = PAGESIZE * 3;
     memory_block_t *new_block;
 
-    if(size + 16 > EXTEND_SIZE) {
-        new_block = (memory_block_t *) csbrk(ALIGN(size + 16));
-        // printf("extend, creating block of size %ld\n", ALIGN(size + 16));
+    if(size + HEADER_SIZE > EXTEND_SIZE) {
+        new_block = (memory_block_t *) csbrk(ALIGN(size + HEADER_SIZE));
+        // printf("extend, creating block of size %ld\n", ALIGN(size + HEADER_SIZE));
 
-        new_block->block_size_alloc = ALIGN(size + 16) - HEADER_SIZE;
+        new_block->block_size_alloc = ALIGN(size + HEADER_SIZE) - HEADER_SIZE;
         // printf("block_size_alloc is %ld\n", get_size(new_block));
     } else {
         new_block = (memory_block_t *) csbrk(EXTEND_SIZE);
