@@ -29,7 +29,7 @@ void *csbrk(intptr_t increment)
     if (increment > 16 * PAGESIZE)
     {
         printf("%ld %d %d\n", increment, 8 * PAGESIZE, increment > 8 * PAGESIZE);
-        fprintf(stderr, "Memory request execeeds limit hello\n");
+        fprintf(stderr, "Memory request execeeds limit\n");
         return NULL;
     }
 
