@@ -28,7 +28,7 @@ void allocate(memory_block_t *block);
 void deallocate(memory_block_t *block);
 size_t get_size(memory_block_t *block);
 memory_block_t *get_next(memory_block_t *block);
-void put_block(memory_block_t *block, size_t size, bool alloc);
+void put_block(memory_block_t *block, size_t size, memory_block_t *prev, bool alloc);
 void *get_payload(memory_block_t *block);
 memory_block_t *get_block(void *payload);
 void add_to_alloc_list(memory_block_t *block);

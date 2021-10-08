@@ -11,7 +11,7 @@ const char author[] = ANSI_BOLD ANSI_COLOR_RED "Jake Medina jrm7784" ANSI_RESET;
  * struct, they can be adjusted as necessary.
  */
 
-// A sample pointer to the start of the free list.
+// A pointer to the HEADER NODE of the free list.
 memory_block_t *free_head;
 
 // A pointer to the start of the allocated list.
@@ -66,13 +66,14 @@ memory_block_t *get_next(memory_block_t *block) {
 /*
  * put_block - puts a block struct into memory at the specified address.
  * Initializes the size and allocated fields, along with NUlling out the next 
- * field.
+ * field. Sets the block's prev field.
  */
-void put_block(memory_block_t *block, size_t size, bool alloc) {
+void put_block(memory_block_t *block, size_t size, memory_block_t *prev, bool alloc) {
     assert(block != NULL);
     assert(size % ALIGNMENT == 0);
     assert(alloc >> 1 == 0);
     block->block_size_alloc = size | alloc;
+    block->prev = prev;
     block->next = NULL;
 }
 
@@ -92,61 +93,6 @@ memory_block_t *get_block(void *payload) {
     return ((memory_block_t *)payload) - 1;
 }
 
-void add_to_alloc_list(memory_block_t *block) {
-    assert(block != NULL);
-    assert(is_allocated(block));
-    
-    //we must change the NEXT pointer of the previous allocated block to point to this block
-
-    if(alloc_head) {
-        //we must loop through all allocated blocks to find the 
-        //end of the allocated list, which will point to the PREVIOUS ALLOCATED BLOCK
-
-        memory_block_t *cur = alloc_head;
-        while(cur->next) {
-            cur = cur->next;
-        }
-        //set the next field of this last element to point to our newly allocated block
-        cur->next = block;
-        block->next = NULL;
-    } else {
-        alloc_head = block;
-        alloc_head->next = NULL;
-    }
-
-    // block->next = NULL;
-}
-
-void remove_from_alloc_list(memory_block_t *block) {
-    assert(block != NULL);
-    // assert(!is_allocated(block));
-    assert(alloc_head); //make sure the alloc list is not empty
-
-    //if we are removing the first element, we can simply set
-    //alloc_head to alloc_head->next
-    if (alloc_head == block) {
-        alloc_head = alloc_head->next;
-        block->next = NULL;
-        return;
-    }
-
-    memory_block_t *prev = NULL;
-    memory_block_t *cur = alloc_head;
-    while(cur != block) {
-        prev = cur;
-        cur = cur->next;
-    }
-    prev->next = cur->next;
-    cur->next = NULL;
-
-    // while (cur) {
-    //     if (cur == block) {
-    //         //we must remove this block from the list
-    //         prev->next = cur->next;
-    //     }
-    // }
-}
-
 /*
  * The following are helper functions that can be implemented to assist in your
  * design, but they are not required. 
@@ -162,7 +108,7 @@ memory_block_t *find(size_t size) {
     //uses first-fit algorithm
 
     //start at the beginning of the free list
-    memory_block_t *current_block = free_head;
+    memory_block_t *current_block = free_head->next;
 
     //while we still have blocks remaining in the free list
     while(current_block) {
@@ -188,6 +134,9 @@ memory_block_t *extend(size_t size) {
 
     //creates a new block that will fit memory of [size]
 
+    //NOTE: the memory from this method will NOT be added to the 
+    //free list because it's purpose is to be allocated immediately
+
     int EXTEND_SIZE = PAGESIZE * 3;
     memory_block_t *new_block;
 
@@ -201,27 +150,39 @@ memory_block_t *extend(size_t size) {
         new_block = (memory_block_t *) csbrk(EXTEND_SIZE);
         new_block->block_size_alloc = EXTEND_SIZE - HEADER_SIZE;
     }
-    
+
+    new_block->prev = NULL;
     new_block->next = NULL;
 
     return new_block;
 }
 
 /*
- * split - splits a given block in parts, one allocated, one free.
+ * split - splits a given block in parts, one FOR ALLOCATION, one free.
  * pre: size must be ALIGNMENT-byte aligned.
+ * If the block does not have room to be split, return the same block.
  */
 memory_block_t *split(memory_block_t *block, size_t size) {
+
+    int requested_size = size + HEADER_SIZE; //we MUST have at least this total block size
+    int f_block_total_size = block->block_size_alloc - requested_size;
+
+    // printf("attempting to split this block of size %ld\n", block->block_size_alloc + HEADER_SIZE);
+    // printf("into size %d", requested_size);
+    // printf("and %d\n", f_block_total_size);
+
     assert(!is_allocated(block));
     assert(size % ALIGNMENT == 0);
     //ensure that we didn't accidentally request too much
-    assert(size < block->block_size_alloc + HEADER_SIZE);
+    // assert(requested_size < block->block_size_alloc + HEADER_SIZE);
     
-    memory_block_t *f_block = (void *) block + size; //portion of the block to be left unallocated
-    put_block(f_block, block->block_size_alloc - size, false);
+    if (f_block_total_size > 0) {
+        memory_block_t *f_block = (void *) block + requested_size; //portion of the block to be left unallocated
+        put_block(f_block, block->block_size_alloc - requested_size, block, false);
 
-    block->block_size_alloc = size - HEADER_SIZE;
-    block->next = f_block;
+        block->block_size_alloc = requested_size;
+        block->next = f_block;
+    }
 
     return block;
 }
@@ -246,13 +207,16 @@ int uinit() {
     
     //call csbrk() with size PAGESIZE * 2 and add it to the free list!
     int INITIAL_SIZE = PAGESIZE * 2;
-    free_head = (memory_block_t *) csbrk(INITIAL_SIZE);
 
+    //this block of memory is used exclusively for our header node
+    free_head = (memory_block_t *) csbrk(32);
+
+    memory_block_t *init_block = (memory_block_t *) csbrk(INITIAL_SIZE);
     //store (amount of free memory at the beginning of the list) - (header size)
-    free_head->block_size_alloc = INITIAL_SIZE - HEADER_SIZE;
+    //define that this is the only block in the free list (prev = free_head)
+    put_block(init_block, INITIAL_SIZE - HEADER_SIZE, free_head, false);
 
-    //define that this is the only block in the free list
-    free_head->next = NULL; //is this already set to null?
+    free_head->next = init_block;
 
     return 0;
 }
@@ -275,6 +239,7 @@ void *umalloc(size_t size) {
 
         //do not split if ALIGN(size) = found_block->block_size_alloc + HEADER_SIZE
         //this will create a pointer to nothing
+        // printf("splitting...\n");
         found_block = split(found_block, ALIGN(size));
 
         // printf("found a block, allocating...");
@@ -284,30 +249,26 @@ void *umalloc(size_t size) {
         //REMOVE THE BLOCK FROM THE FREE LIST
         //assumes first-fit algohirthm
         //if the block is at the beginning of the free list,
-        //then we need to set free_head to the next element in the list
+        //then we need to set free_head->next to the next element in the list
         //keep in mind that the next element could be null!
-        free_head = found_block->next;
+        free_head->next = found_block->next;
 
-        if(alloc_list) {
-            // printf("adding to alloc list\n");
-            add_to_alloc_list(found_block);
-        } else {
-            found_block->next = MAGIC_NUM;
-        }
+        found_block->prev = MAGIC_NUM;
+        found_block->next = MAGIC_NUM;
 
         return get_payload(found_block);
     } else {
         //no memory avaliable, we need to extend
         // printf("no memory avaliable, extending...");
         memory_block_t *new_block = extend(size);
+        //NOTE: the memory from extend will never be added to the free list
+        //because it's purpose is to be allocated immediately
+        
         allocate(new_block);
 
-        if(alloc_list) {
-            // printf("adding our brand new memory to alloc list\n");
-            add_to_alloc_list(new_block);
-        } else {
-            new_block->next = MAGIC_NUM;
-        }
+        new_block->prev = MAGIC_NUM;
+        new_block->next = MAGIC_NUM;
+
         
         //DO LATER - split the new block?
         //we would have to add the part that we don't use to the free list
@@ -327,18 +288,14 @@ void ufree(void *ptr) {
     //if the user tries to free an unallocated block, do nothing
     //we know that the block is unallocated because it will not have a magic number (if not using alloc list)
     if( is_allocated(block) && (alloc_list ? true : &(block->next) == MAGIC_NUM) ) {
-
-        //if we are using the allocated list, we need to remove our block from there
-        if (alloc_list) {
-            remove_from_alloc_list(block);
-        }
         
         //we need to convert this block into a free block
         deallocate(block);
 
-        //if the free list is empty, we can simply set free_head to the block
-        if (!free_head) {
-            free_head = block;
+        //if the free list is empty, we can simply set free_head->next to the block
+        if (!free_head->next) {
+            free_head->next = block;
+            block->prev = free_head;
             block->next = NULL;
             return;
         }
@@ -346,7 +303,7 @@ void ufree(void *ptr) {
 
         //figure out where to insert this block into the free list
         memory_block_t *prev_free_block = NULL;
-        memory_block_t *current_free_block = free_head;
+        memory_block_t *current_free_block = free_head->next;
 
         while (current_free_block) {
             if (&block < &current_free_block) {
@@ -354,12 +311,14 @@ void ufree(void *ptr) {
 
                 //check if this block will be at the beginning of the free list
                 if (!prev_free_block) {
-                    block->next = free_head;
-                    free_head = block;
+                    block->prev = free_head;
+                    block->next = free_head->next;
+                    free_head->next = block;
                     return;
                 } else {
                     //splice!
                     prev_free_block->next = block;
+                    block->prev = prev_free_block;
                     block->next = current_free_block;
                     return;
                 }
