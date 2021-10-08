@@ -1,0 +1,4 @@
+to do list for malloc
+1. change free list to make use of doubly linked free list
+2. remove printf statements in split
+3. 

@@ -105,22 +105,43 @@ memory_block_t *find(size_t size) {
 
     //we must traverse through our free list to see if there is a fit
 
-    //uses first-fit algorithm
+    // //uses first-fit algorithm
 
-    //start at the beginning of the free list
-    memory_block_t *current_block = free_head->next;
+    // //start at the beginning of the free list
+    // memory_block_t *current_block = free_head->next;
 
-    //while we still have blocks remaining in the free list
-    while(current_block) {
-        //check if the malloc call will fit
-        int requested_size = ALIGN(size);
-        if (get_size(current_block) >= requested_size) {
-            //this malloc call will fit, return this block
-            return current_block;
-        } else {
-            //keep going, traverse to the next free block
-            current_block = current_block->next;
+    // //while we still have blocks remaining in the free list
+    // while(current_block) {
+    //     //check if the malloc call will fit
+    //     int requested_size = ALIGN(size);
+    //     if (get_size(current_block) >= requested_size) {
+    //         //this malloc call will fit, return this block
+    //         return current_block;
+    //     } else {
+    //         //keep going, traverse to the next free block
+    //         current_block = current_block->next;
+    //     }
+    
+    //uses best-fit algorithm
+    
+    //use a pointer to point to the best (smallest) block we have found so far
+    memory_block_t *best = free_head->next;
+    memory_block_t *cur = free_head->next;
+    
+    int requested_size = ALIGN(size);
+    //loop thru the entire free list
+    while(cur) {
+        //check if the malloc call will fit AND check if the size 
+        //is smaller than the previous best fit
+        if (get_size(cur) >= requested_size) {
+            //this malloc call will fit, is it a better fit than the previous block?
+            if (!best || cur->block_size_alloc < best->block_size_alloc) {
+                //this block is a better fit
+                best = cur;
+            }
+            //keep going until the end
         }
+        cur = cur->next;
     }
 
     //if a block is not found, return null
@@ -247,12 +268,9 @@ void *umalloc(size_t size) {
         allocate(found_block);
 
         //REMOVE THE BLOCK FROM THE FREE LIST
-        //assumes first-fit algohirthm
-        //if the block is at the beginning of the free list,
-        //then we need to set free_head->next to the next element in the list
-        //keep in mind that the next element could be null!
-        free_head->next = found_block->next;
-
+        //asssumes best-fit algorithm
+        found_block->prev->next = found_block->next;
+        found_block->next->prev = found_block->prev;
         found_block->prev = MAGIC_NUM;
         found_block->next = MAGIC_NUM;
 
