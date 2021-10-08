@@ -1,6 +1,6 @@
 # Makefile
 CC = gcc
-OPT_FLAG = -O0 # -O0 for use with GDB, -O2 for testing performance
+OPT_FLAG = -O2 # -O0 for use with GDB, -O2 for testing performance
 CFLAGS = -Wall $(OPT_FLAG) -Werror -ggdb
 
 all: runner performance gprof_performance
