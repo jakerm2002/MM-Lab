@@ -135,7 +135,7 @@ memory_block_t *find(size_t size) {
         //is smaller than the previous best fit
         if (get_size(cur) >= requested_size) {
             //this malloc call will fit, is it a better fit than the previous block?
-            if (!best || cur->block_size_alloc < best->block_size_alloc) {
+            if (!best || get_size(cur) < get_size(best)) {
                 //this block is a better fit
                 best = cur;
             }
@@ -209,10 +209,57 @@ memory_block_t *split(memory_block_t *block, size_t size) {
 }
 
 /*
+ * coalesce_prev - coalesces a free memory block with its previous neighbor.
+ */
+memory_block_t *coalesce_prev(memory_block_t *block) {
+    //we want to make sure we don't coalesce with the HEADER node!
+    if(block->prev != free_head) {
+        block->prev->next = block->next;
+        block->next->prev = block->prev;
+        
+        //change the size of the prev block to include this one
+        block->prev->block_size_alloc = get_size(block->prev) + get_size(block) + HEADER_SIZE;
+
+        //remove the pointers from the block
+        //and change to a magic num for debugging
+        block->prev = MAGIC_NUM_COALESCE;
+        block->next = MAGIC_NUM_COALESCE;
+
+        return block;
+    }
+    //if the block was not coalesced, return the unchanged block
+    return block;
+}
+
+/*
+ * coalesce_next - coalesces a free memory block with its next neighbor.
+ */
+memory_block_t *coalesce_next(memory_block_t *block) {
+    if(block->next != NULL) {
+        block->block_size_alloc = get_size(block) + get_size(block->next) + HEADER_SIZE;
+
+        block->next = block->next->next;
+        
+        block->next->prev = MAGIC_NUM_COALESCE;
+        block->next->next = MAGIC_NUM_COALESCE;
+
+        return block;
+    }
+    return block;
+    //if the block was not coalesced, return the unchanged block
+}
+
+/*
  * coalesce - coalesces a free memory block with neighbors.
  */
 memory_block_t *coalesce(memory_block_t *block) {
-    return NULL;
+    assert(!is_allocated(block));
+
+    //pointer to the coalesced block if operation was successful
+    memory_block_t *prev_coalesce = coalesce_prev(block);
+    memory_block_t *result = coalesce_next(prev_coalesce);
+
+    return result;
 }
 
 
@@ -315,6 +362,7 @@ void ufree(void *ptr) {
             free_head->next = block;
             block->prev = free_head;
             block->next = NULL;
+            coalesce(block);
             return;
         }
 
@@ -332,12 +380,14 @@ void ufree(void *ptr) {
                     block->prev = free_head;
                     block->next = free_head->next;
                     free_head->next = block;
+                    coalesce(block);
                     return;
                 } else {
                     //splice!
                     prev_free_block->next = block;
                     block->prev = prev_free_block;
                     block->next = current_free_block;
+                    coalesce(block);
                     return;
                 }
                 
@@ -352,6 +402,7 @@ void ufree(void *ptr) {
         //append the free block to the end of the list
         prev_free_block->next = block;
         block->next = NULL;
+        coalesce(block);
         return;
 
     }
