@@ -104,28 +104,11 @@ memory_block_t *get_block(void *payload) {
 memory_block_t *find(size_t size) {
 
     //we must traverse through our free list to see if there is a fit
-
-    // //uses first-fit algorithm
-
-    // //start at the beginning of the free list
-    // memory_block_t *current_block = free_head->next;
-
-    // //while we still have blocks remaining in the free list
-    // while(current_block) {
-    //     //check if the malloc call will fit
-    //     int requested_size = ALIGN(size);
-    //     if (get_size(current_block) >= requested_size) {
-    //         //this malloc call will fit, return this block
-    //         return current_block;
-    //     } else {
-    //         //keep going, traverse to the next free block
-    //         current_block = current_block->next;
-    //     }
     
     //uses best-fit algorithm
     
     //use a pointer to point to the best (smallest) block we have found so far
-    memory_block_t *best = free_head->next;
+    memory_block_t *best = NULL;
     memory_block_t *cur = free_head->next;
     
     int requested_size = ALIGN(size);
@@ -144,8 +127,7 @@ memory_block_t *find(size_t size) {
         cur = cur->next;
     }
 
-    //if a block is not found, return null
-    return NULL;
+    return best;
 }
 
 /*
@@ -188,9 +170,9 @@ memory_block_t *split(memory_block_t *block, size_t size) {
     int requested_size = size + HEADER_SIZE; //we MUST have at least this total block size
     int f_block_total_size = block->block_size_alloc - requested_size;
 
-    // printf("attempting to split this block of size %ld\n", block->block_size_alloc + HEADER_SIZE);
-    // printf("into size %d", requested_size);
-    // printf("and %d\n", f_block_total_size);
+    printf("attempting to split this block of size %ld\n", block->block_size_alloc + HEADER_SIZE);
+    printf("into size %d", requested_size);
+    printf("and %d\n", f_block_total_size);
 
     assert(!is_allocated(block));
     assert(size % ALIGNMENT == 0);
@@ -214,6 +196,7 @@ memory_block_t *split(memory_block_t *block, size_t size) {
 memory_block_t *coalesce_prev(memory_block_t *block) {
     //we want to make sure we don't coalesce with the HEADER node!
     if(block->prev != free_head) {
+        printf("coalescing prev...\n");
         block->prev->next = block->next;
         block->next->prev = block->prev;
         
@@ -236,6 +219,7 @@ memory_block_t *coalesce_prev(memory_block_t *block) {
  */
 memory_block_t *coalesce_next(memory_block_t *block) {
     if(block->next != NULL) {
+        printf("coalescing next...\n");
         block->block_size_alloc = get_size(block) + get_size(block->next) + HEADER_SIZE;
 
         block->next = block->next->next;
@@ -270,7 +254,7 @@ memory_block_t *coalesce(memory_block_t *block) {
  */
 int uinit() {
 
-    // printf("initializing...\n");
+    printf("initializing...\n");
     
     
     //call csbrk() with size PAGESIZE * 2 and add it to the free list!
@@ -307,7 +291,7 @@ void *umalloc(size_t size) {
 
         //do not split if ALIGN(size) = found_block->block_size_alloc + HEADER_SIZE
         //this will create a pointer to nothing
-        // printf("splitting...\n");
+        printf("splitting...\n");
         found_block = split(found_block, ALIGN(size));
 
         // printf("found a block, allocating...");
@@ -317,9 +301,13 @@ void *umalloc(size_t size) {
         //REMOVE THE BLOCK FROM THE FREE LIST
         //asssumes best-fit algorithm
         found_block->prev->next = found_block->next;
-        found_block->next->prev = found_block->prev;
+
+        //special case: block is at the end of the free list
+        if(found_block->next) {
+            found_block->next->prev = found_block->prev;
+            found_block->next = MAGIC_NUM;
+        }
         found_block->prev = MAGIC_NUM;
-        found_block->next = MAGIC_NUM;
 
         return get_payload(found_block);
     } else {
