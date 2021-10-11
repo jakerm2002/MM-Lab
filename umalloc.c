@@ -170,9 +170,9 @@ memory_block_t *split(memory_block_t *block, size_t size) {
     int requested_size = size + HEADER_SIZE; //we MUST have at least this total block size
     int f_block_total_size = block->block_size_alloc - requested_size;
 
-    printf("attempting to split this block of size %ld\n", block->block_size_alloc + HEADER_SIZE);
-    printf("into size %d", requested_size);
-    printf("and %d\n", f_block_total_size);
+    // printf("attempting to split this block of size %ld\n", block->block_size_alloc + HEADER_SIZE);
+    // printf("into size %d", requested_size);
+    // printf("and %d\n", f_block_total_size);
 
     assert(!is_allocated(block));
     assert(size % ALIGNMENT == 0);
@@ -196,7 +196,7 @@ memory_block_t *split(memory_block_t *block, size_t size) {
 memory_block_t *coalesce_prev(memory_block_t *block) {
     //we want to make sure we don't coalesce with the HEADER node!
     if(block->prev != free_head) {
-        printf("coalescing prev...\n");
+        // printf("coalescing prev...\n");
         block->prev->next = block->next;
         block->next->prev = block->prev;
         
@@ -219,7 +219,7 @@ memory_block_t *coalesce_prev(memory_block_t *block) {
  */
 memory_block_t *coalesce_next(memory_block_t *block) {
     if(block->next != NULL) {
-        printf("coalescing next...\n");
+        // printf("coalescing next...\n");
         block->block_size_alloc = get_size(block) + get_size(block->next) + HEADER_SIZE;
 
         block->next = block->next->next;
@@ -254,7 +254,7 @@ memory_block_t *coalesce(memory_block_t *block) {
  */
 int uinit() {
 
-    printf("initializing...\n");
+    // printf("initializing...\n");
     
     
     //call csbrk() with size PAGESIZE * 2 and add it to the free list!
@@ -291,7 +291,7 @@ void *umalloc(size_t size) {
 
         //do not split if ALIGN(size) = found_block->block_size_alloc + HEADER_SIZE
         //this will create a pointer to nothing
-        printf("splitting...\n");
+        // printf("splitting...\n");
         found_block = split(found_block, ALIGN(size));
 
         // printf("found a block, allocating...");
