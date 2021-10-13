@@ -215,9 +215,76 @@ memory_block_t *split(memory_block_t *block, size_t size) {
 }
 
 /*
+ * coalesce_prev - coalesces a free memory block with its previous neighbor.
+ */
+memory_block_t *coalesce_prev(memory_block_t *block) {
+    //we want to make sure we don't coalesce with the HEADER node!
+    //we also want to make sure the blocks are contiguous in memory.
+
+    if(block->prev != free_head && ((void *) block->prev + HEADER_SIZE + block->prev->block_size_alloc == (void *) block)) {
+        printf("coalescing prev...\n");
+        int prev_block_t_size = block->prev->block_size_alloc + HEADER_SIZE;
+        int this_block_t_size = block->block_size_alloc + HEADER_SIZE;
+        int new_block_t_size = prev_block_t_size + this_block_t_size;
+
+        memory_block_t *prev_block = block->prev;
+        memory_block_t *next_block = block->next;
+
+        put_block(prev_block, new_block_t_size - HEADER_SIZE, prev_block->prev, false);
+
+        //update the free list pointers
+        prev_block->prev->next = prev_block; //this is technically unnecessary
+        prev_block->next = next_block;
+        if (next_block) {
+            next_block->prev = prev_block;
+        }
+        return prev_block;
+    } else {
+        printf("no prev coalesce\n");
+        //if the block was not coalesced, return the unchanged block
+        return block;
+    }
+}
+
+/*
+ * coalesce_prev - coalesces a free memory block with its next neighbor.
+ */
+memory_block_t *coalesce_next(memory_block_t *block) {
+    //we want to make sure that there is a next block!
+    //we also want to make sure the blocks are contiguous in memory.
+
+    if(block->next && ((void *) block + HEADER_SIZE + block->block_size_alloc == (void *) block->next)) {
+        printf("coalescing next...\n");
+        int this_block_t_size = block->block_size_alloc + HEADER_SIZE;
+        int next_block_t_size = block->next->block_size_alloc + HEADER_SIZE;
+        int new_block_t_size = this_block_t_size + next_block_t_size;
+
+        memory_block_t *this_block = block;
+        // memory_block_t *next_block = block->next;
+        memory_block_t *next_next_block = block->next->next;
+
+        put_block(this_block, new_block_t_size - HEADER_SIZE, this_block->prev, false);
+
+        //update the free list pointers
+        this_block->prev->next = this_block; //this is technically unnecessary
+        if (next_next_block) {
+            this_block->next = next_next_block;
+            next_next_block->prev = this_block;
+        }
+        return this_block;
+    } else {
+        printf("no next coalesce\n");
+        //if the block was not coalesced, return the unchanged block
+        return block;
+    }
+}
+
+/*
  * coalesce - coalesces a free memory block with neighbors.
  */
 memory_block_t *coalesce(memory_block_t *block) {
+    memory_block_t *c_block = coalesce_prev(block);
+    c_block = coalesce_next(c_block);
     return NULL;
 }
 
@@ -320,6 +387,7 @@ void ufree(void *ptr) {
                 block->prev = prev;
                 block->next = cur;
                 cur->prev = block;
+                coalesce(block);
                 return;
             } else {
                 //keep going...
@@ -332,6 +400,7 @@ void ufree(void *ptr) {
         prev->next = block;
         block->prev = prev;
         block->next = cur;
+        coalesce(block);
         return;
     }
     
