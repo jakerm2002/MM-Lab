@@ -56,11 +56,11 @@ int check_heap() {
         return 20;
     }
 
-    //check all allocated blocks
-    block = alloc_head;
-    if (check_alignment(block)) {
-        return 25;
-    }
+    // //check all allocated blocks
+    // block = alloc_head;
+    // if (check_alignment(block)) {
+    //     return 25;
+    // }
     
 
     //HEAP CHECK #3
@@ -75,7 +75,7 @@ int check_heap() {
         //first two statements make sure we are not comparing a memory address 
         //to NULL in the case that there is only one block in the free list OR
         //we are at the end of the free list
-        if(!prev && !cur && (&prev >= &cur)) {
+        if(!prev && !cur && (prev >= cur)) {
             return 30;
         }
         //moves the pointers to the next pair of blocks
@@ -84,34 +84,34 @@ int check_heap() {
     }
 
 
-    //HEAP CHECK #4
-    // Check if any allocated blocks overlap with each other.
-    // Returns either 40 or 45 depending if the overlap is found
-    // near the beginning or end of a block.
+    // //HEAP CHECK #4
+    // // Check if any allocated blocks overlap with each other.
+    // // Returns either 40 or 45 depending if the overlap is found
+    // // near the beginning or end of a block.
 
-    //need two linked list pointers
-    cur = alloc_head;
+    // //need two linked list pointers
+    // cur = alloc_head;
 
-    //checks each allocated block with all other allocated blocks.
-    while (cur) {
-        memory_block_t *loop = alloc_head;
-        while (loop) {
-            //ensure that we are not checking a block with itself
-            if (cur != loop) {
-                //check if start_address(cur) is within address range of [loop] (indicates overlap)
-                if ( (cur >= loop) && ((void *)cur < (void *)loop + get_size(loop)) ) {
-                    return 40;
-                }
+    // //checks each allocated block with all other allocated blocks.
+    // while (cur) {
+    //     memory_block_t *loop = alloc_head;
+    //     while (loop) {
+    //         //ensure that we are not checking a block with itself
+    //         if (cur != loop) {
+    //             //check if start_address(cur) is within address range of [loop] (indicates overlap)
+    //             if ( (cur >= loop) && ((void *)cur < (void *)loop + get_size(loop)) ) {
+    //                 return 40;
+    //             }
 
-                //check if end_address(cur) is within address range of [loop] (indicates overlap)
-                if ( ((void *)cur + get_size(cur) > (void *)loop) && ((void *)cur + get_size(cur) <= (void *)loop + get_size(loop)) ) {
-                    return 45;
-                }
-            }
-            loop = loop->next;
-        }
-        cur = cur->next;
-    }
+    //             //check if end_address(cur) is within address range of [loop] (indicates overlap)
+    //             if ( ((void *)cur + get_size(cur) > (void *)loop) && ((void *)cur + get_size(cur) <= (void *)loop + get_size(loop)) ) {
+    //                 return 45;
+    //             }
+    //         }
+    //         loop = loop->next;
+    //     }
+    //     cur = cur->next;
+    // }
 
 
     return 0;
