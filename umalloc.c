@@ -170,42 +170,48 @@ memory_block_t *extend(size_t size) {
  */
 memory_block_t *split(memory_block_t *block, size_t size) {
     assert(!is_allocated(block));
+    assert(block->prev != MAGIC_NUM);
+    assert(block->next != MAGIC_NUM);
     assert(size % ALIGNMENT == 0);
 
-    // int block_t_size = block->block_size_alloc + HEADER_SIZE;
-    // printf("BLOCK T_SIZE = %d \n", block_t_size);
-    // int a_block_t_size = size + HEADER_SIZE;
-    // int f_block_t_size = block_t_size - a_block_t_size;
+    int block_t_size = block->block_size_alloc + HEADER_SIZE;
+    int a_block_t_size = size + HEADER_SIZE;
+    int f_block_t_size = block_t_size - a_block_t_size;
 
-    // printf("a_block_t_size = %d \n", a_block_t_size);
-    // if(f_block_t_size > HEADER_SIZE) {
-    //     printf("&BLOCK START = %p \n", block);
-    //     printf("&BLOCK END = %p \n", (void *) block + block->block_size_alloc + HEADER_SIZE);
-    //     printf("BLOCK->PREV = %p \n", block->prev);
-    //     printf("BLOCK->NEXT = %p \n", block->next);
-    //     memory_block_t *f_block = (void *) block + a_block_t_size;
+    memory_block_t *block_prev = block->prev;
+    memory_block_t *block_next = block->next;
 
-    //     f_block->block_size_alloc = block->block_size_alloc - a_block_t_size;
-    //     f_block->prev = block;
-    //     f_block->next = block->next;
+    if (f_block_t_size > 32) {
+        //this block goes to allocation
+        put_block(block, size, MAGIC_NUM, true);
+        block->next = MAGIC_NUM;
 
-    //     block->block_size_alloc = size;
-    //     block->next = f_block;
-    //     printf("&A_BLOCK START = %p \n", block);
-    //     printf("&A_BLOCK END = %p \n", (void *) block + block->block_size_alloc + HEADER_SIZE);
-    //     printf("A_BLOCK T_SIZE = %ld \n", block->block_size_alloc + HEADER_SIZE);
-    //     printf("A_BLOCK->PREV = %p \n", block->prev);
-    //     printf("A_BLOCK->NEXT = %p \n", block->next);
-    //     printf("&F_BLOCK START = %p \n", f_block);
-    //     printf("&F_BLOCK END = %p \n", (void *) f_block + f_block->block_size_alloc + HEADER_SIZE);
-    //     printf("F_BLOCK T_SIZE = %ld \n", f_block->block_size_alloc + HEADER_SIZE);
-    //     printf("F_BLOCK->PREV = %p \n", f_block->prev);
-    //     printf("F_BLOCK->NEXT = %p \n", f_block->next);
-    // }
+        //the remaining part goes to the free list
+        memory_block_t *f_block = (void *) block + a_block_t_size;
+        put_block(f_block, f_block_t_size - HEADER_SIZE, block_prev, false);
+        f_block->next = block_next;
 
-    
+        //set the free list pointers to our free block
+        block_prev->next = f_block;
+        if (block_next) {
+            block_next->prev = f_block;
+        }
+        return block;
+    } else {
+        memory_block_t *f_block = block->next;
 
-    return block;
+        //just allocate the whole block bruh
+        put_block(block, block->block_size_alloc, MAGIC_NUM, true);
+        block->next = MAGIC_NUM;
+
+        //set the free list pointers to skip over this free block
+        block_prev->next = f_block;
+        if (f_block) {
+            f_block->prev = block_prev; 
+        }
+        
+        return block;
+    }
 }
 
 /*
@@ -262,32 +268,15 @@ void *umalloc(size_t size) {
         //this will create a pointer to nothing
         // printf("splitting...\n");
         // found_block = split(found_block, ALIGN(size));
-        split(found_block, ALIGN(size));
+        found_block = split(found_block, ALIGN(size));
 
-        printf("found and allocating a block of T_SIZE :%ld\n",found_block->block_size_alloc + HEADER_SIZE);
-        //allocate the memory
-        allocate(found_block);
-
-        //REMOVE THE BLOCK FROM THE FREE LIST
-        //asssumes best-fit algorithm
-        found_block->prev->next = found_block->next;
-        printf("removing block from free list...\n");
-        printf("previous block in free list now has next pointer to %p \n", found_block->next);
-
-        //special case: block is at the end of the free list
-        if(found_block->next) {
-            found_block->next->prev = found_block->prev;
-            printf("next block in free list now has prev pointer to %p \n", found_block->prev);
-        }
-
-        found_block->next = MAGIC_NUM;
-        found_block->prev = MAGIC_NUM;
+        // printf("found and allocating a block of T_SIZE :%ld\n",found_block->block_size_alloc + HEADER_SIZE);
 
         return get_payload(found_block);
     } else {
         //no memory avaliable, we need to extend
         memory_block_t *new_block = extend(size);
-        printf("no memory avaliable, creating new block of T_SIZE: %ld\n", new_block->block_size_alloc + HEADER_SIZE);
+        // printf("no memory avaliable, creating new block of T_SIZE: %ld\n", new_block->block_size_alloc + HEADER_SIZE);
         //NOTE: the memory from extend will never be added to the free list
         //because it's purpose is to be allocated immediately
         
@@ -322,7 +311,7 @@ void ufree(void *ptr) {
         //we need to convert this block into a free block
         deallocate(block);
 
-        printf("freeing a block...\n");
+        // printf("freeing a block...\n");
 
         // cases:
         // free list is empty
@@ -340,8 +329,8 @@ void ufree(void *ptr) {
                 block->prev = prev;
                 block->next = cur;
                 cur->prev = block;
-                printf("block->prev is %p ", block->prev);
-                printf("block->next is %p ", block->next);
+                // printf("block->prev is %p ", block->prev);
+                // printf("block->next is %p ", block->next);
                 return;
             } else {
                 //keep going...
@@ -354,8 +343,8 @@ void ufree(void *ptr) {
         prev->next = block;
         block->prev = prev;
         block->next = cur;
-        printf("block->prev is %p \n", block->prev);
-        printf("block->next is %p \n", block->next);
+        // printf("block->prev is %p \n", block->prev);
+        // printf("block->next is %p \n", block->next);
         return;
 
 

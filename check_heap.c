@@ -1,5 +1,6 @@
 
 #include "umalloc.h"
+#include <stdio.h>
 
 //Place any variables needed here from umalloc.c as an extern.
 extern memory_block_t *free_head;
@@ -38,6 +39,7 @@ int check_heap() {
     // If a block is marked allocated, return 10.
     memory_block_t *cur = free_head;
     while (cur) {
+        printf("size: %ld\n", cur->block_size_alloc);
         if (is_allocated(cur)) {
             return 10;
         }
