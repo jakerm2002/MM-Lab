@@ -150,17 +150,51 @@ memory_block_t *extend(size_t size) {
         new_block = (memory_block_t *) csbrk(ALIGN(size + HEADER_SIZE));
         // printf("extend, creating block of size %ld\n", ALIGN(size + HEADER_SIZE));
 
-        new_block->block_size_alloc = ALIGN(size + HEADER_SIZE) - HEADER_SIZE;
+        // new_block->block_size_alloc = ALIGN(size + HEADER_SIZE) - HEADER_SIZE;
+        put_block(new_block, ALIGN(size + HEADER_SIZE) - HEADER_SIZE, MAGIC_NUM, true);
+        new_block->next = MAGIC_NUM;
         // printf("block_size_alloc is %ld\n", get_size(new_block));
+        return new_block;
     } else {
         new_block = (memory_block_t *) csbrk(EXTEND_SIZE);
         new_block->block_size_alloc = EXTEND_SIZE - HEADER_SIZE;
+
+        //split this extended block into two parts: one for allocation, and one to be added to the free list.
+        int block_t_size = new_block->block_size_alloc + HEADER_SIZE;
+        int a_block_t_size = ALIGN(size) + HEADER_SIZE;
+        int f_block_t_size = block_t_size - a_block_t_size;
+        
+        if (f_block_t_size > 32) {
+            //we are going to split.
+            put_block(new_block, a_block_t_size - HEADER_SIZE, MAGIC_NUM, true);
+            new_block->next = MAGIC_NUM;
+
+            //the remaining part goes to the free list
+
+                //traverse to the end of the free list
+            memory_block_t *free_end = free_head;
+            while (free_end->next) {
+                free_end = free_end->next;
+            }
+
+            memory_block_t *f_block = (void *) new_block + a_block_t_size;
+            free_end->next = f_block;
+            put_block(f_block, f_block_t_size - HEADER_SIZE, free_end, false); //next pointer will be NULL
+            return new_block;
+        } else {
+            //split block is does not have enough left over for a free block.
+            
+            //just allocate the whole block.
+            put_block(new_block, new_block->block_size_alloc, MAGIC_NUM, true);
+            new_block->next = MAGIC_NUM;
+            return new_block;
+        }
     }
 
-    new_block->prev = NULL;
-    new_block->next = NULL;
+    // new_block->prev = NULL;
+    // new_block->next = NULL;
 
-    return new_block;
+    // return new_block;
 }
 
 /*
@@ -341,11 +375,11 @@ void *umalloc(size_t size) {
         // printf("no memory avaliable, creating new block of T_SIZE: %ld\n", new_block->block_size_alloc + HEADER_SIZE);
         //NOTE: the memory from extend will never be added to the free list
         //because it's purpose is to be allocated immediately
-        
-        allocate(new_block);
 
-        new_block->prev = MAGIC_NUM;
-        new_block->next = MAGIC_NUM;
+        // allocate(new_block);
+
+        // new_block->prev = MAGIC_NUM;
+        // new_block->next = MAGIC_NUM;
 
         
         //DO LATER - split the new block?
