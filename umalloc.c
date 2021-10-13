@@ -253,9 +253,6 @@ int uinit() {
  */
 void *umalloc(size_t size) {
 
-    // printf("allocating a block of size\n");
-    // printf("%d\n", (int) size);
-
     memory_block_t *found_block = find(size);
     //points to a block of at least ALIGN(size)
 
@@ -266,8 +263,6 @@ void *umalloc(size_t size) {
 
         //do not split if ALIGN(size) = found_block->block_size_alloc + HEADER_SIZE
         //this will create a pointer to nothing
-        // printf("splitting...\n");
-        // found_block = split(found_block, ALIGN(size));
         found_block = split(found_block, ALIGN(size));
 
         // printf("found and allocating a block of T_SIZE :%ld\n",found_block->block_size_alloc + HEADER_SIZE);
@@ -299,8 +294,6 @@ void *umalloc(size_t size) {
  * by a previous call to malloc.
  */
 void ufree(void *ptr) {
-
-    // printf("free");
     memory_block_t *block = get_block(ptr);
     //if the user tries to free an unallocated block, do nothing
     //we know that the block is unallocated because it will not have a magic number (if not using alloc list)
@@ -310,8 +303,6 @@ void ufree(void *ptr) {
         
         //we need to convert this block into a free block
         deallocate(block);
-
-        // printf("freeing a block...\n");
 
         // cases:
         // free list is empty
@@ -329,8 +320,6 @@ void ufree(void *ptr) {
                 block->prev = prev;
                 block->next = cur;
                 cur->prev = block;
-                // printf("block->prev is %p ", block->prev);
-                // printf("block->next is %p ", block->next);
                 return;
             } else {
                 //keep going...
@@ -343,11 +332,7 @@ void ufree(void *ptr) {
         prev->next = block;
         block->prev = prev;
         block->next = cur;
-        // printf("block->prev is %p \n", block->prev);
-        // printf("block->next is %p \n", block->next);
         return;
-
-
     }
     
     //if we reach here, the block was either not set as allocated or did not
