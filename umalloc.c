@@ -222,7 +222,7 @@ memory_block_t *coalesce_prev(memory_block_t *block) {
     //we also want to make sure the blocks are contiguous in memory.
 
     if(block->prev != free_head && ((void *) block->prev + HEADER_SIZE + block->prev->block_size_alloc == (void *) block)) {
-        printf("coalescing prev...\n");
+        // printf("coalescing prev...\n");
         int prev_block_t_size = block->prev->block_size_alloc + HEADER_SIZE;
         int this_block_t_size = block->block_size_alloc + HEADER_SIZE;
         int new_block_t_size = prev_block_t_size + this_block_t_size;
@@ -240,7 +240,7 @@ memory_block_t *coalesce_prev(memory_block_t *block) {
         }
         return prev_block;
     } else {
-        printf("no prev coalesce\n");
+        // printf("no prev coalesce\n");
         //if the block was not coalesced, return the unchanged block
         return block;
     }
@@ -254,7 +254,7 @@ memory_block_t *coalesce_next(memory_block_t *block) {
     //we also want to make sure the blocks are contiguous in memory.
 
     if(block->next && ((void *) block + HEADER_SIZE + block->block_size_alloc == (void *) block->next)) {
-        printf("coalescing next...\n");
+        // printf("coalescing next...\n");
         int this_block_t_size = block->block_size_alloc + HEADER_SIZE;
         int next_block_t_size = block->next->block_size_alloc + HEADER_SIZE;
         int new_block_t_size = this_block_t_size + next_block_t_size;
@@ -273,7 +273,7 @@ memory_block_t *coalesce_next(memory_block_t *block) {
         }
         return this_block;
     } else {
-        printf("no next coalesce\n");
+        // printf("no next coalesce\n");
         //if the block was not coalesced, return the unchanged block
         return block;
     }
