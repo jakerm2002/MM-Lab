@@ -104,9 +104,7 @@ memory_block_t *get_block(void *payload) {
 memory_block_t *find(size_t size) {
 
     //we must traverse through our free list to see if there is a fit
-    
-    //uses best-fit algorithm
-    
+    //uses BEST-FIT algorithm
     //use a pointer to point to the best (smallest) block we have found so far
     memory_block_t *best = NULL;
     memory_block_t *cur = free_head->next;
@@ -124,7 +122,6 @@ memory_block_t *find(size_t size) {
                 //this block is a better fit
                 best = cur;
             }
-            //keep going until the end
         }
         cur = cur->next;
     }
@@ -135,25 +132,19 @@ memory_block_t *find(size_t size) {
 
 /*
  * extend - extends the heap if more memory is required.
+ * attempts to create a new block of default size PAGESIZE * 3.
+ * will split the block if the size requested is smaller than PAGESIZE * 3.
+ * otherwise, will create a block for an exact fit of the requested size.
  */
 memory_block_t *extend(size_t size) {
-
-    //creates a new block that will fit memory of [size]
-
-    //NOTE: the memory from this method will NOT be added to the 
-    //free list because it's purpose is to be allocated immediately
 
     int EXTEND_SIZE = PAGESIZE * 3;
     memory_block_t *new_block;
 
     if(size + HEADER_SIZE > EXTEND_SIZE) {
         new_block = (memory_block_t *) csbrk(ALIGN(size + HEADER_SIZE));
-        // printf("extend, creating block of size %ld\n", ALIGN(size + HEADER_SIZE));
-
-        // new_block->block_size_alloc = ALIGN(size + HEADER_SIZE) - HEADER_SIZE;
         put_block(new_block, ALIGN(size + HEADER_SIZE) - HEADER_SIZE, MAGIC_NUM, true);
         new_block->next = MAGIC_NUM;
-        // printf("block_size_alloc is %ld\n", get_size(new_block));
         return new_block;
     } else {
         new_block = (memory_block_t *) csbrk(EXTEND_SIZE);
@@ -164,14 +155,13 @@ memory_block_t *extend(size_t size) {
         int a_block_t_size = ALIGN(size) + HEADER_SIZE;
         int f_block_t_size = block_t_size - a_block_t_size;
         
-        if (f_block_t_size > 32) {
-            //we are going to split.
+        if (f_block_t_size > HEADER_SIZE) {
+            //split this block.
             put_block(new_block, a_block_t_size - HEADER_SIZE, MAGIC_NUM, true);
             new_block->next = MAGIC_NUM;
 
             //the remaining part goes to the free list
-
-                //traverse to the end of the free list
+            //get a pointer to end of the free list
             memory_block_t *free_end = free_head;
             while (free_end->next) {
                 free_end = free_end->next;
@@ -183,18 +173,12 @@ memory_block_t *extend(size_t size) {
             return new_block;
         } else {
             //split block is does not have enough left over for a free block.
-            
             //just allocate the whole block.
             put_block(new_block, new_block->block_size_alloc, MAGIC_NUM, true);
             new_block->next = MAGIC_NUM;
             return new_block;
         }
     }
-
-    // new_block->prev = NULL;
-    // new_block->next = NULL;
-
-    // return new_block;
 }
 
 /*
@@ -215,7 +199,7 @@ memory_block_t *split(memory_block_t *block, size_t size) {
     memory_block_t *block_prev = block->prev;
     memory_block_t *block_next = block->next;
 
-    if (f_block_t_size > 32) {
+    if (f_block_t_size > HEADER_SIZE) {
         //this block goes to allocation
         put_block(block, size, MAGIC_NUM, true);
         block->next = MAGIC_NUM;
@@ -243,7 +227,6 @@ memory_block_t *split(memory_block_t *block, size_t size) {
         if (f_block) {
             f_block->prev = block_prev; 
         }
-        
         return block;
     }
 }
@@ -252,11 +235,10 @@ memory_block_t *split(memory_block_t *block, size_t size) {
  * coalesce_prev - coalesces a free memory block with its previous neighbor.
  */
 memory_block_t *coalesce_prev(memory_block_t *block) {
+    
     //we want to make sure we don't coalesce with the HEADER node!
     //we also want to make sure the blocks are contiguous in memory.
-
     if(block->prev != free_head && ((void *) block->prev + HEADER_SIZE + block->prev->block_size_alloc == (void *) block)) {
-        // printf("coalescing prev...\n");
         int prev_block_t_size = block->prev->block_size_alloc + HEADER_SIZE;
         int this_block_t_size = block->block_size_alloc + HEADER_SIZE;
         int new_block_t_size = prev_block_t_size + this_block_t_size;
@@ -274,7 +256,6 @@ memory_block_t *coalesce_prev(memory_block_t *block) {
         }
         return prev_block;
     } else {
-        // printf("no prev coalesce\n");
         //if the block was not coalesced, return the unchanged block
         return block;
     }
@@ -288,26 +269,23 @@ memory_block_t *coalesce_next(memory_block_t *block) {
     //we also want to make sure the blocks are contiguous in memory.
 
     if(block->next && ((void *) block + HEADER_SIZE + block->block_size_alloc == (void *) block->next)) {
-        // printf("coalescing next...\n");
         int this_block_t_size = block->block_size_alloc + HEADER_SIZE;
         int next_block_t_size = block->next->block_size_alloc + HEADER_SIZE;
         int new_block_t_size = this_block_t_size + next_block_t_size;
 
         memory_block_t *this_block = block;
-        // memory_block_t *next_block = block->next;
         memory_block_t *next_next_block = block->next->next;
 
         put_block(this_block, new_block_t_size - HEADER_SIZE, this_block->prev, false);
 
         //update the free list pointers
         this_block->prev->next = this_block; //this is technically unnecessary
+        this_block->next = next_next_block;
         if (next_next_block) {
-            this_block->next = next_next_block;
             next_next_block->prev = this_block;
         }
         return this_block;
     } else {
-        // printf("no next coalesce\n");
         //if the block was not coalesced, return the unchanged block
         return block;
     }
@@ -319,7 +297,7 @@ memory_block_t *coalesce_next(memory_block_t *block) {
 memory_block_t *coalesce(memory_block_t *block) {
     memory_block_t *c_block = coalesce_prev(block);
     c_block = coalesce_next(c_block);
-    return NULL;
+    return c_block;
 }
 
 
@@ -329,23 +307,18 @@ memory_block_t *coalesce(memory_block_t *block) {
  * along with allocating initial memory.
  */
 int uinit() {
-
-    // printf("initializing...\n");
-    
     
     //call csbrk() with size PAGESIZE * 2 and add it to the free list!
     int INITIAL_SIZE = PAGESIZE * 2;
 
     //this block of memory is used exclusively for our header node
     free_head = (memory_block_t *) csbrk(32);
-
     memory_block_t *init_block = (memory_block_t *) csbrk(INITIAL_SIZE);
+
     //store (amount of free memory at the beginning of the list) - (header size)
     //define that this is the only block in the free list (prev = free_head)
     put_block(init_block, INITIAL_SIZE - HEADER_SIZE, free_head, false);
-
     free_head->next = init_block;
-
     return 0;
 }
 
@@ -353,41 +326,19 @@ int uinit() {
  * umalloc -  allocates size bytes and returns a pointer to the allocated memory.
  */
 void *umalloc(size_t size) {
-
     memory_block_t *found_block = find(size);
     //points to a block of at least ALIGN(size)
 
     if(found_block) {
-
         //we will split the block here
         //pass in an aligned size parameter, i.e. ALIGN(size)
-
-        //do not split if ALIGN(size) = found_block->block_size_alloc + HEADER_SIZE
-        //this will create a pointer to nothing
         found_block = split(found_block, ALIGN(size));
-
-        // printf("found and allocating a block of T_SIZE :%ld\n",found_block->block_size_alloc + HEADER_SIZE);
-
         return get_payload(found_block);
     } else {
         //no memory avaliable, we need to extend
         memory_block_t *new_block = extend(size);
-        // printf("no memory avaliable, creating new block of T_SIZE: %ld\n", new_block->block_size_alloc + HEADER_SIZE);
-        //NOTE: the memory from extend will never be added to the free list
-        //because it's purpose is to be allocated immediately
-
-        // allocate(new_block);
-
-        // new_block->prev = MAGIC_NUM;
-        // new_block->next = MAGIC_NUM;
-
-        
-        //DO LATER - split the new block?
-        //we would have to add the part that we don't use to the free list
-
         return get_payload(new_block);
     }
-
 }
 
 /*
@@ -396,21 +347,12 @@ void *umalloc(size_t size) {
  */
 void ufree(void *ptr) {
     memory_block_t *block = get_block(ptr);
-    //if the user tries to free an unallocated block, do nothing
-    //we know that the block is unallocated because it will not have a magic number (if not using alloc list)
+    //make sure we are not trying to free an unallocated block
     assert(is_allocated(block));
 
     if( is_allocated(block) && (block->next == MAGIC_NUM) ) {
-        
         //we need to convert this block into a free block
         deallocate(block);
-
-        // cases:
-        // free list is empty
-        // block is at the beginning of free list
-        // block is in between two plocks
-        // block is at the end of free list
-
         memory_block_t *prev = free_head;
         memory_block_t *cur = free_head->next;
 
@@ -437,7 +379,4 @@ void ufree(void *ptr) {
         coalesce(block);
         return;
     }
-    
-    //if we reach here, the block was either not set as allocated or did not
-    //contain the magic number
 }
