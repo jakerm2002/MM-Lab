@@ -6,7 +6,6 @@
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
 #define HEADER_SIZE 32
 #define MAGIC_NUM (void *) 0xDEADBEEF
-#define MAGIC_NUM_COALESCE (void *) 0xC0A1E5CE
 
 /*
  * memory_block_t - Represents a block of memory managed by the heap. The 

@@ -4,7 +4,7 @@
 
 //Place any variables needed here from umalloc.c as an extern.
 extern memory_block_t *free_head;
-extern memory_block_t *alloc_head;
+// extern memory_block_t *alloc_head;
 
 /*
  * check_alignment - used to ensure that every block in a list of
@@ -39,7 +39,6 @@ int check_heap() {
     // If a block is marked allocated, return 10.
     memory_block_t *cur = free_head;
     while (cur) {
-        printf("size: %ld\n", cur->block_size_alloc);
         if (is_allocated(cur)) {
             return 10;
         }
@@ -86,10 +85,10 @@ int check_heap() {
     }
 
 
-    // //HEAP CHECK #4
-    // // Check if any allocated blocks overlap with each other.
-    // // Returns either 40 or 45 depending if the overlap is found
-    // // near the beginning or end of a block.
+    //HEAP CHECK #4
+    // Check if any allocated blocks overlap with each other.
+    // Returns either 40 or 45 depending if the overlap is found
+    // near the beginning or end of a block.
 
     // //need two linked list pointers
     // cur = alloc_head;
