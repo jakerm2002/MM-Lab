@@ -1,3 +1,23 @@
+/*
+
+Welcome to my malloc lab! This malloc implementation uses a best-fit algorithm
+when searching for free blocks. The code will choose the block that minimizes
+the size of the leftover payload. The free list is implemented using a doubly 
+linked list, with ONE DUMMY NODE (free_head) whos next field points to the first 
+block in the free list. Blocks are inserted into the free list in order of
+the memory address of their headers. Blocks are removed from the free list by 
+removing references to that block from its previous and next neighbors in the 
+free list. free_head->next will point to null if the free list is empty.
+The blocks with smaller memory addresses will be
+closer to the beginning of the list. My malloc implementation implements
+both splitting and coalescing. Splitting is done once the best-fit block is
+found. If there is no best fit block, a new block will be created. The new block
+may or may not be split (see split method). Coalescing is done immmediately upon
+freeing a block. The code attempts to coalesce a block with its previous neighbor
+in the free list, and it will then do the same with its next neighbor.
+
+*/
+
 #include "umalloc.h"
 #include "csbrk.h"
 #include "ansicolors.h"
